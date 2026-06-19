@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Исторический Навигатор">
+  <rect width="64" height="64" rx="18" fill="#1E1E1E"/>
+  <path d="M17 16h12c3 0 5 2.2 5 5v28c-2.1-1.7-4.6-2.5-7.6-2.5H17V16Z" fill="#F5F5F5"/>
+  <path d="M47 16H35c-3 0-5 2.2-5 5v28c2.1-1.7 4.6-2.5 7.6-2.5H47V16Z" fill="#F5F5F5"/>
+  <path d="M32 16v34" stroke="#3A7AFE" stroke-width="4" stroke-linecap="round"/>
+  <path d="M22 24h6M22 31h6M36 24h6M36 31h6M36 38h5" stroke="#1E1E1E" stroke-width="2.4" stroke-linecap="round"/>
+</svg>
