@@ -488,22 +488,26 @@
             </p>
             <div class="grid grid-cols-2 gap-2 lg:grid-cols-1">
               <button
-                onclick="switchMode('home')"
+                type="button"
+                data-mode-target="home"
                 id="btn-mode-home"
                 class="mode-button"
               ></button>
               <button
-                onclick="switchMode('read')"
+                type="button"
+                data-mode-target="read"
                 id="btn-mode-read"
                 class="mode-button"
               ></button>
               <button
-                onclick="switchMode('cards')"
+                type="button"
+                data-mode-target="cards"
                 id="btn-mode-cards"
                 class="mode-button"
               ></button>
               <button
-                onclick="switchMode('quiz')"
+                type="button"
+                data-mode-target="quiz"
                 id="btn-mode-quiz"
                 class="mode-button"
               ></button>
@@ -3307,12 +3311,15 @@
         }
 
         if (mode === "cards") {
-          requestAnimationFrame(() => renderCards());
+          renderCards();
         } else if (mode === "quiz") {
           startQuiz();
         }
 
         resetPeriodFilterScroll();
+        if (isMobile) {
+          requestAnimationFrame(() => window.scrollTo({ top: 0, behavior: "auto" }));
+        }
       }
 
       function resetPeriodFilterScroll() {
@@ -3332,6 +3339,13 @@
               ? event.target
               : event.target.parentElement;
           if (!target || !target.closest) return;
+
+          const modeButton = target.closest("[data-mode-target]");
+          if (modeButton) {
+            event.preventDefault();
+            switchMode(modeButton.getAttribute("data-mode-target"));
+            return;
+          }
 
           const topicButton = target.closest("[data-topic-id]");
           if (topicButton) {
