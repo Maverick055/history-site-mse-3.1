@@ -1,17 +1,22 @@
 (function () {
     const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const lowPowerUI = window.matchMedia('(max-width: 1023px), (pointer: coarse)');
+    const sheetMedia = window.matchMedia('(max-width: 1023px)');
     const storageKey = `codex_periods_collapsed_${location.pathname}`;
     const collapsedPeriodKey = `codex_collapsed_periods_${location.pathname}`;
     const maxResults = 8;
     const searchInputSelector = '#global-search, #mobile-search, #mobile-top-search';
     let mobileSheetOpen = false;
+    let premiumTOCSignature = '';
+    let premiumPeriodsSignature = '';
     let ticketSearchIndex = null;
     let ticketSearchIndexSource = null;
     let ticketSearchIndexLength = 0;
     const ticketSearchEntryMap = new WeakMap();
+    const ticketMetaMap = new WeakMap();
 
     function canAnimate() {
-        return !reduceMotion && window.gsap;
+        return !reduceMotion && !lowPowerUI.matches && window.gsap;
     }
 
     function getTickets() {
@@ -84,7 +89,8 @@
     }
 
     function extractDates(item) {
-        const text = stripMarkup(item.content);
+        const cached = ticketSearchEntryMap.get(item);
+        const text = cached ? cached.summaryText : stripMarkup(item.content);
         const matches = text.match(/\b\d{1,2}\s*(?:января|февраля|марта|апреля|мая|июня|июля|августа|сентября|октября|ноября|декабря|авг\.|сент\.|окт\.|нояб\.|дек\.)\s+\d{4}\s*г?\.?|\b\d{4}[-–]\d{4}(?:-х)?\s*(?:гг?\.?)?|\b\d{4}\s*(?:г\.|года|гг\.)?/gi) || [];
         return [...new Set(matches)].slice(0, 3).join(' · ') || 'ключевые даты внутри билета';
     }
@@ -140,10 +146,15 @@
     }
 
     function ticketMeta(item) {
-        const clean = stripMarkup(item.content);
+        const cachedMeta = ticketMetaMap.get(item);
+        if (cachedMeta) return cachedMeta;
+        const cached = ticketSearchEntryMap.get(item);
+        const clean = cached ? cached.summaryText : stripMarkup(item.content);
         const dateText = extractDates(item);
         const termsCount = (clean.match(/[А-ЯA-ZЁ][а-яa-zё-]{3,}/g) || []).length;
-        return { dateText, termsCount };
+        const meta = { dateText, termsCount };
+        ticketMetaMap.set(item, meta);
+        return meta;
     }
 
     function renderTicketCard(item) {
@@ -208,10 +219,15 @@
         const container = document.getElementById('toc-container');
         if (!container) return;
         const data = getVisibleTickets(list);
+        const signature = data.map(item => item.id).join('|') + `::${getReadSections().join('|')}`;
         if (!data.length) {
+            if (premiumTOCSignature === 'empty') return;
+            premiumTOCSignature = 'empty';
             container.innerHTML = '<div class="rounded-xl bg-slate-50 p-4 text-center text-xs text-slate-500 dark:bg-slate-800">Ничего не найдено.</div>';
             return;
         }
+        if (premiumTOCSignature === signature) return;
+        premiumTOCSignature = signature;
 
         const categories = {};
         data.forEach((item) => {
@@ -227,34 +243,46 @@
         const container = document.getElementById('period-filter');
         if (!container || typeof window.periodTopics !== 'function') return false;
         const categories = [...new Set(getTickets().map(item => item.category))];
+        const allTopics = window.periodTopics('all');
+        const periodItems = categories
+            .map(cat => ({ id: cat, label: cat, topics: window.periodTopics(cat) }))
+            .filter(item => item.topics.length > 0);
         const items = [
-            { id: 'all', label: 'Все периоды', count: window.periodTopics('all').length },
-            ...categories
-                .map(cat => ({ id: cat, label: cat, count: window.periodTopics(cat).length }))
-                .filter(item => item.count > 0)
+            { id: 'all', label: 'Все периоды', topics: allTopics },
+            ...periodItems
         ];
+        const collapsedSignature = [...readCollapsedPeriods()].sort().join('|');
+        const readSignature = getReadSections().join('|');
+        const signature = items
+            .map(item => `${item.id}:${item.topics.map(topic => topic.id).join(',')}`)
+            .join(';') + `::${collapsedSignature}::${readSignature}`;
 
-        if (!items.length || !items[0].count) {
+        if (!items.length || !items[0].topics.length) {
+            if (premiumPeriodsSignature === 'empty') return true;
+            premiumPeriodsSignature = 'empty';
             container.innerHTML = '<div class="rounded-xl bg-black/5 p-4 text-center text-xs text-black/50 dark:bg-white/10 dark:text-white/50">Поиск ничего не нашел.</div>';
             return true;
         }
+        if (premiumPeriodsSignature === signature) return true;
+        premiumPeriodsSignature = signature;
 
         container.innerHTML = items.map(item => `
             <div class="period-group ${readCollapsedPeriods().has(periodKey(item.id)) ? 'is-collapsed' : ''} rounded-2xl border border-black/5 bg-white/70 p-2 dark:border-white/10 dark:bg-white/5">
                 <button type="button" class="period-btn codex-period-heading" data-period-toggle="${escapeHTML(periodKey(item.id))}" aria-expanded="${String(!readCollapsedPeriods().has(periodKey(item.id)))}">
                     <span class="line-clamp-2">${escapeHTML(item.label)}</span>
-                    <span class="codex-period-count">${item.count}</span>
+                    <span class="codex-period-count">${item.topics.length}</span>
                     <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M19 9l-7 7-7-7"></path>
                     </svg>
                 </button>
                 <div class="codex-period-body mt-2">
                     <div class="codex-period-content space-y-2">
-                        ${window.periodTopics(item.id).map(renderTicketCard).join('')}
+                        ${item.topics.map(renderTicketCard).join('')}
                     </div>
                 </div>
             </div>
         `).join('');
+        container.scrollTop = 0;
         return true;
     }
 
@@ -296,7 +324,21 @@
             .map(result => result.item);
     }
 
+    // Drawer search keeps its dropdown in flow inside the drawer; every other
+    // search field portals its dropdown to <body> (see ensureSearchPanel).
+    function isDrawerInput(input) {
+        return Boolean(input && input.closest('#mobile-drawer'));
+    }
+
     // Lightweight client-side search panel with generated TL;DR previews.
+    //
+    // The panel for top-level search fields (#global-search, #mobile-top-search)
+    // is appended directly to <body>. This is deliberate: GSAP shell animations
+    // leave a `transform` on .site-search / .codex-mobile-search-row, and any
+    // non-`none` transform turns that element into the containing block for a
+    // position:fixed child — which would offset the dropdown by the wrap's own
+    // position and push it off-screen. Portaling to <body> guarantees the
+    // fixed dropdown is always positioned relative to the viewport.
     function ensureSearchPanel(input) {
         if (!input) return null;
         if (!input.getAttribute('aria-label')) {
@@ -319,20 +361,64 @@
         }
         if (parent) parent.classList.toggle('codex-search-has-value', Boolean(input.value.trim()));
 
-        let panel = parent ? parent.querySelector('.codex-search-panel') : null;
-        if (!panel) {
-            panel = document.createElement('div');
-            panel.className = 'codex-search-panel';
-            panel.hidden = true;
+        let panel = input.__codexPanel;
+        if (panel && panel.isConnected) return panel;
+
+        panel = document.createElement('div');
+        panel.className = 'codex-search-panel';
+        panel.hidden = true;
+        panel.__codexInput = input;
+        input.__codexPanel = panel;
+
+        if (isDrawerInput(input)) {
+            // Drawer dropdown stays in flow, anchored to its wrap.
             const clear = parent ? parent.querySelector('.codex-search-clear') : null;
             (clear || input).insertAdjacentElement('afterend', panel);
+            panel.classList.add('codex-search-panel--drawer');
+        } else {
+            document.body.appendChild(panel);
         }
         return panel;
     }
 
+    // Position a portaled (top-level) dropdown as a fixed layer aligned to its
+    // input. Drawer dropdowns keep their in-flow positioning from CSS.
+    function positionFixedPanel(panel) {
+        const input = panel.__codexInput;
+        if (!input || isDrawerInput(input)) {
+            panel.classList.remove('codex-search-panel--fixed');
+            panel.style.position = '';
+            panel.style.left = '';
+            panel.style.right = '';
+            panel.style.top = '';
+            panel.style.width = '';
+            panel.style.maxHeight = '';
+            return;
+        }
+        const rect = input.getBoundingClientRect();
+        const margin = 12;
+        const width = Math.min(rect.width, window.innerWidth - margin * 2);
+        let left = rect.left;
+        if (left + width > window.innerWidth - margin) left = window.innerWidth - margin - width;
+        if (left < margin) left = margin;
+        panel.classList.add('codex-search-panel--fixed');
+        panel.style.position = 'fixed';
+        panel.style.left = left + 'px';
+        panel.style.right = 'auto';
+        panel.style.top = (rect.bottom + 6) + 'px';
+        panel.style.width = width + 'px';
+        panel.style.maxHeight = 'min(70vh, 640px)';
+    }
+
+    function repositionVisiblePanels() {
+        document.querySelectorAll('.codex-search-panel:not([hidden])').forEach(positionFixedPanel);
+    }
+
     function showPanel(panel) {
-        if (!panel || !panel.hidden) return;
+        if (!panel) return;
+        gsap.killTweensOf(panel);
         panel.hidden = false;
+        positionFixedPanel(panel);
         if (canAnimate()) {
             gsap.fromTo(panel, { autoAlpha: 0, y: -8, scale: 0.985 }, {
                 autoAlpha: 1,
@@ -341,6 +427,8 @@
                 duration: 0.24,
                 ease: 'power2.out'
             });
+        } else {
+            gsap.set(panel, { autoAlpha: 1, y: 0, scale: 1 });
         }
     }
 
@@ -348,6 +436,7 @@
         document.querySelectorAll('.codex-search-panel').forEach((panel) => {
             if (panel === exceptPanel) return;
             if (panel.hidden) return;
+            gsap.killTweensOf(panel);
             if (canAnimate()) {
                 gsap.to(panel, {
                     autoAlpha: 0,
@@ -720,9 +809,11 @@
                 commitSearchState(query, activeInput);
                 return;
             }
+            const trimmed = String(query || '').trim();
+            if (trimmed && trimmed.length < 2) return;
             deferredSearchTimer = window.setTimeout(() => {
                 commitSearchState(query, activeInput);
-            }, 160);
+            }, 320);
         }
 
         document.addEventListener('input', (event) => {
@@ -802,7 +893,7 @@
                 closeMobileSheet();
                 return;
             }
-            if (!event.target.closest('.codex-search-wrap')) hidePanels();
+            if (!event.target.closest('.codex-search-wrap') && !event.target.closest('.codex-search-panel')) hidePanels();
         });
 
         document.addEventListener('keydown', (event) => {
@@ -872,7 +963,7 @@
         const label = toolbar.querySelector('span');
 
         function applyState(collapsed, animate) {
-            if (window.matchMedia('(max-width: 1023px)').matches) return;
+            if (sheetMedia.matches) return;
             button.setAttribute('aria-expanded', String(!collapsed));
             label.textContent = collapsed ? 'Развернуть' : 'Свернуть';
             sidebar.classList.toggle('codex-periods-collapsed', collapsed);
@@ -880,7 +971,7 @@
 
         applyState(localStorage.getItem(storageKey) === 'true', false);
         button.addEventListener('click', () => {
-            if (window.matchMedia('(max-width: 1023px)').matches) {
+            if (sheetMedia.matches) {
                 closeMobileSheet();
                 return;
             }
@@ -891,7 +982,7 @@
         sidebar.dataset.codexPeriodReady = 'true';
     }
 
-    // Mobile: convert the periods panel into a GSAP bottom sheet.
+    // Mobile layouts: convert the periods panel into a bottom sheet.
     function ensureMobileSheet() {
         const sidebar = document.getElementById('sidebar-toc');
         if (!sidebar || document.getElementById('codex-period-sheet-trigger')) return;
@@ -929,7 +1020,7 @@
         const overlay = document.getElementById('codex-period-sheet-overlay');
         if (!sidebar) return;
 
-        if (!window.matchMedia('(max-width: 1023px)').matches) {
+        if (!sheetMedia.matches) {
             mobileSheetOpen = false;
             document.body.classList.remove('codex-sheet-open');
             if (overlay) overlay.hidden = true;
@@ -942,7 +1033,7 @@
     function openMobileSheet() {
         const sidebar = document.getElementById('sidebar-toc');
         const overlay = document.getElementById('codex-period-sheet-overlay');
-        if (!sidebar || !overlay || !window.matchMedia('(max-width: 1023px)').matches) return;
+        if (!sidebar || !overlay || !sheetMedia.matches) return;
         mobileSheetOpen = true;
         overlay.hidden = false;
         document.body.classList.add('codex-sheet-open');
@@ -969,12 +1060,13 @@
 
     function animateArticleDetails() {
         if (!canAnimate()) return;
-        const blocks = document.querySelectorAll('#article-body > div, #article-body h4, #article-body li, #article-body p, #article-body details, #article-body button');
-        gsap.fromTo(blocks, { autoAlpha: 0, y: 12 }, {
+        const blocks = [...document.querySelectorAll('#article-body > div, #article-body h4, #article-body li, #article-body p, #article-body details, #article-body button')].slice(0, 14);
+        if (!blocks.length) return;
+        gsap.fromTo(blocks, { autoAlpha: 0, y: 10 }, {
             autoAlpha: 1,
             y: 0,
-            duration: 0.3,
-            stagger: 0.018,
+            duration: 0.2,
+            stagger: 0.014,
             ease: 'power2.out',
             overwrite: true
         });
@@ -987,7 +1079,6 @@
     function wrapExistingFunctions() {
         const originalRenderTOC = window.renderTOC;
         const originalHandleSearch = window.handleSearch;
-        const originalSelectTopic = window.selectTopic;
         const originalRenderPeriods = window.renderPeriods;
 
         if (typeof originalRenderTOC === 'function') {
@@ -1006,18 +1097,6 @@
                 const rendered = renderPremiumPeriods();
                 if (!rendered) originalRenderPeriods.apply(this, args);
                 requestAnimationFrame(animateTOC);
-            };
-        }
-
-        if (typeof originalSelectTopic === 'function') {
-            window.selectTopic = function (...args) {
-                const result = originalSelectTopic.apply(this, args);
-                requestAnimationFrame(() => {
-                    renderPremiumTOC(getVisibleTickets());
-                    animateArticleDetails();
-                    installTilt();
-                });
-                return result;
             };
         }
 
@@ -1043,6 +1122,8 @@
         installTilt();
         animateChrome();
         window.addEventListener('resize', syncResponsiveSheet);
+        window.addEventListener('resize', repositionVisiblePanels);
+        window.addEventListener('scroll', repositionVisiblePanels, { passive: true });
         requestAnimationFrame(() => {
             renderPremiumTOC(getVisibleTickets());
             renderPremiumPeriods();

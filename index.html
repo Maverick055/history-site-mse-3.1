@@ -71,14 +71,14 @@
       .fade-up {
         animation: fadeUp 0.7s ease both;
       }
-      .period-topic-list {
+      body:not(.unified-index) .period-topic-list {
         display: none;
         max-height: 15rem;
         overflow-y: auto;
       }
-      .period-group:hover .period-topic-list,
-      .period-group:focus-within .period-topic-list,
-      .period-group.is-active .period-topic-list {
+      body:not(.unified-index) .period-group:hover .period-topic-list,
+      body:not(.unified-index) .period-group:focus-within .period-topic-list,
+      body:not(.unified-index) .period-group.is-active .period-topic-list {
         display: block;
         animation: topicEnter 0.18s ease both;
       }
@@ -121,14 +121,42 @@
         background-clip: padding-box;
       }
       @media (max-width: 767px) {
+        /* Drawer: GPU-accelerated slide, лучший easing */
         .mobile-drawer {
-          transform: translateX(-105%);
+          transform: translate3d(-105%, 0, 0);
+          transition: transform 260ms cubic-bezier(.22,.61,.36,1) !important;
+          contain: layout paint;
+          will-change: transform;
         }
         .mobile-drawer.open {
-          transform: translateX(0);
+          transform: translate3d(0, 0, 0);
+        }
+        .mobile-drawer:not(.open) {
+          will-change: auto;
+        }
+        /* Overlay: плавный fade через opacity, display управляется hidden-классом */
+        .unified-index #mobile-overlay {
+          transition: opacity 200ms ease;
+        }
+        .unified-index #mobile-overlay:not(.hidden):not(.is-open) {
+          opacity: 0;
+          pointer-events: none;
+        }
+        .unified-index #mobile-overlay.is-open {
+          opacity: 1;
+          pointer-events: auto;
         }
         body.nav-open {
           overflow: hidden;
+          touch-action: none;
+        }
+        /* View-transition: fade-in при смене режима */
+        @keyframes mobileViewIn {
+          from { opacity: 0; transform: translateY(6px); }
+          to   { opacity: 1; transform: translateY(0);   }
+        }
+        .mobile-view-enter {
+          animation: mobileViewIn 220ms cubic-bezier(.22,.61,.36,1) both;
         }
       }
       @media (prefers-reduced-motion: reduce) {
@@ -142,10 +170,19 @@
         }
       }
     </style>
-    <link rel="stylesheet" href="./codex-premium-ui.css?v=20260619-header-stable" />
+    <link rel="stylesheet" href="./codex-premium-ui.css?v=20260620-unified-desktop-template" />
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-7EVTLRSZSY"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+
+      gtag('config', 'G-7EVTLRSZSY');
+    </script>
   </head>
   <body
-    class="min-h-screen bg-paper text-ink font-sans antialiased transition-colors duration-300 dark:bg-[#101010] dark:text-white"
+    class="unified-index min-h-screen bg-paper text-ink font-sans antialiased transition-colors duration-300 dark:bg-[#101010] dark:text-white"
   >
     <div
       class="fixed inset-0 -z-10 bg-[linear-gradient(180deg,#F5F5F5_0%,#FFFFFF_42%,#F5F5F5_100%)] dark:bg-[linear-gradient(180deg,#101010_0%,#181818_48%,#101010_100%)]"
@@ -160,7 +197,7 @@
         <div class="site-brand-group flex min-w-0 flex-1 items-center gap-3">
           <button
             onclick="toggleMobileNav()"
-            class="md:hidden inline-flex h-11 w-11 items-center justify-center rounded-xl border border-black/10 bg-white text-ink shadow-sm dark:border-white/10 dark:bg-white/10 dark:text-white"
+            class="mobile-menu-button inline-flex h-11 w-11 items-center justify-center rounded-xl border border-black/10 bg-white text-ink shadow-sm dark:border-white/10 dark:bg-white/10 dark:text-white"
             aria-label="Открыть навигацию"
             aria-controls="mobile-drawer"
             aria-expanded="false"
@@ -188,9 +225,9 @@
               alt="Логотип Исторического Навигатора"
               class="site-logo h-10 w-10 shrink-0 rounded-2xl shadow-soft sm:h-12 sm:w-12"
             />
-            <span class="min-w-0 flex-1 leading-tight xl:flex-none">
+            <span class="site-title-wrap min-w-0 flex-1 leading-tight xl:flex-none">
               <span
-                class="block truncate whitespace-nowrap font-display text-[clamp(0.9rem,1.4vw,1.3rem)] font-extrabold text-ink dark:text-white"
+                class="site-title block truncate whitespace-nowrap font-display text-[clamp(0.9rem,1.4vw,1.3rem)] font-extrabold text-ink dark:text-white"
                 >Исторический Навигатор</span
               >
             </span>
@@ -325,44 +362,43 @@
               ></path>
             </svg>
           </button>
-          <button
-            onclick="openFirstVisibleTopic()"
-            class="site-start-button hidden rounded-2xl bg-gold px-5 py-3 text-sm font-bold text-white shadow-lift transition hover:-translate-y-0.5 lg:inline-flex"
-          >
-            Начать изучение
-          </button>
         </div>
       </div>
     </header>
 
     <div class="codex-mobile-search-row">
-      <input
-        type="search"
-        id="mobile-top-search"
-        oninput="handleSearch(this.value)"
-        placeholder="Поиск по билетам, датам, терминам..."
-        autocomplete="off"
-        aria-label="Поиск по билетам, датам и терминам"
-      />
+      <div class="mobile-search-field">
+        <svg class="mobile-search-icon" width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+        </svg>
+        <input
+          type="search"
+          id="mobile-top-search"
+          oninput="handleSearch(this.value)"
+          placeholder="Поиск по билетам, датам, терминам..."
+          autocomplete="off"
+          aria-label="Поиск по билетам, датам и терминам"
+        />
+      </div>
     </div>
 
     <div
       id="mobile-overlay"
       onclick="toggleMobileNav(false)"
-      class="fixed inset-0 z-40 hidden bg-black/45 md:hidden"
+      class="fixed inset-0 z-40 hidden bg-black/45"
       aria-hidden="true"
     ></div>
 
     <div
-      class="mx-auto grid max-w-7xl grid-cols-1 gap-8 px-4 pb-10 pt-28 sm:px-6 lg:grid-cols-[20rem_1fr] lg:px-8"
+      class="app-shell mx-auto grid max-w-7xl grid-cols-1 gap-8 px-4 pb-10 pt-28 sm:px-6 lg:grid-cols-[20rem_1fr] lg:px-8"
     >
       <aside
         id="mobile-drawer"
-        class="mobile-drawer fixed left-0 top-0 z-50 h-dvh w-[92vw] max-w-sm overflow-y-auto bg-paper p-4 shadow-2xl transition-transform duration-300 dark:bg-[#101010] md:static md:z-auto md:h-fit md:w-auto md:max-w-none md:translate-x-0 md:bg-transparent md:p-0 md:shadow-none lg:sticky lg:top-28 lg:max-h-[calc(100vh-8rem)]"
+        class="mobile-drawer fixed left-0 top-0 z-50 h-dvh w-[92vw] max-w-sm overflow-y-auto bg-paper p-4 shadow-2xl transition-transform duration-300 dark:bg-[#101010]"
         role="navigation"
         aria-label="Навигация по курсу"
       >
-        <div class="mb-4 flex items-center justify-between md:hidden">
+        <div class="mobile-drawer-header mb-4 flex items-center justify-between">
           <div class="flex items-center gap-2">
             <img
               src="./logo.svg"
@@ -392,9 +428,9 @@
           </button>
         </div>
 
-        <div class="space-y-4">
+        <div id="sidebar-stack" class="space-y-4 lg:flex lg:flex-col lg:flex-1 lg:space-y-0 lg:gap-4 lg:min-h-0">
           <div
-            class="rounded-2xl border border-black/5 bg-white/90 p-3 shadow-soft dark:border-white/10 dark:bg-white/5 md:hidden"
+            class="drawer-search-card rounded-2xl border border-black/5 bg-white/90 p-3 shadow-soft dark:border-white/10 dark:bg-white/5"
           >
             <div class="relative">
               <input
@@ -443,7 +479,7 @@
           </div>
 
           <div
-            class="rounded-2xl border border-black/5 bg-white/90 p-3 shadow-soft dark:border-white/10 dark:bg-white/5"
+            class="mode-card rounded-2xl border border-black/5 bg-white/90 p-3 shadow-soft dark:border-white/10 dark:bg-white/5"
           >
             <p
               class="px-2 pb-2 text-xs font-bold uppercase tracking-wider text-black/50 dark:text-white/50"
@@ -475,9 +511,10 @@
           </div>
 
           <div
-            class="rounded-2xl border border-black/5 bg-white/90 p-3 shadow-soft dark:border-white/10 dark:bg-white/5"
+            id="periods-card"
+            class="periods-card periods-panel rounded-2xl border border-black/5 bg-white/90 p-3 shadow-soft dark:border-white/10 dark:bg-white/5 lg:flex lg:flex-col lg:flex-1 lg:min-h-0"
           >
-            <div class="flex items-center justify-between gap-3 px-2 pb-2">
+            <div class="periods-card-header flex items-center justify-between gap-3 px-2 pb-2">
               <p
                 class="text-xs font-bold uppercase tracking-wider text-black/50 dark:text-white/50"
               >
@@ -485,13 +522,13 @@
               </p>
               <button
                 type="button"
-                onclick="clearSearch()"
+                onclick="resetPeriodsPanel()"
                 class="text-xs font-semibold text-gold hover:text-ink dark:hover:text-white"
               >
                 Сброс
               </button>
             </div>
-            <div id="period-filter" class="space-y-1"></div>
+            <div id="period-filter" class="space-y-1 lg:flex-1 lg:overflow-y-auto lg:min-h-0"></div>
           </div>
 
           <div
@@ -515,19 +552,6 @@
             <div id="search-results" class="space-y-4"></div>
           </div>
 
-          <div
-            class="rounded-2xl border border-black/5 bg-white/90 p-4 shadow-soft dark:border-white/10 dark:bg-white/5"
-          >
-            <p
-              class="mb-2 text-xs font-bold uppercase tracking-wider text-black/50 dark:text-white/50"
-            >
-              Избранное
-            </p>
-            <div
-              id="bookmarks-container"
-              class="space-y-2 text-xs text-black/60 dark:text-white/60"
-            ></div>
-          </div>
         </div>
       </aside>
 
@@ -542,7 +566,7 @@
                 >Интерактивный курс истории</span
               >
               <h1
-                class="mt-6 max-w-4xl font-display text-4xl font-black leading-[1.05] tracking-normal text-ink dark:text-white sm:text-6xl lg:text-7xl"
+                class="home-hero-title mt-6 max-w-4xl font-display font-black leading-[1.05] tracking-normal text-ink dark:text-white"
               >
                 История. Просто. Понятно. Интерактивно.
               </h1>
@@ -560,61 +584,64 @@
                 >
                   Начать изучение
                 </button>
-                <button
-                  onclick="switchMode('cards')"
-                  class="rounded-2xl border border-black/10 bg-white px-6 py-4 text-sm font-extrabold text-ink shadow-sm transition hover:-translate-y-0.5 hover:border-gold/40 dark:border-white/10 dark:bg-white/10 dark:text-white"
-                >
-                  Открыть карточки
-                </button>
               </div>
               <div
-                class="mt-10 grid max-w-2xl grid-cols-1 gap-3 sm:grid-cols-3"
+                class="home-stat-grid mt-10 grid max-w-2xl grid-cols-1 gap-3 sm:grid-cols-3"
               >
-                <div
-                  class="rounded-2xl border border-black/5 bg-white p-4 shadow-soft dark:border-white/10 dark:bg-white/5"
+                <button
+                  type="button"
+                  onclick="openFirstVisibleTopic()"
+                  class="home-stat-card rounded-2xl border border-black/5 bg-white p-4 text-left shadow-soft dark:border-white/10 dark:bg-white/5"
+                  aria-label="Открыть билеты"
                 >
-                  <div
+                  <span
                     id="stat-topics"
-                    class="font-display text-3xl font-black text-ink dark:text-white"
+                    class="block font-display text-3xl font-black text-ink dark:text-white"
                   >
                     0
-                  </div>
-                  <div
-                    class="mt-1 text-xs font-bold uppercase text-black/50 dark:text-white/50"
+                  </span>
+                  <span
+                    class="mt-1 block text-xs font-bold uppercase text-black/50 dark:text-white/50"
                   >
                     билетов
-                  </div>
-                </div>
-                <div
-                  class="rounded-2xl border border-black/5 bg-white p-4 shadow-soft dark:border-white/10 dark:bg-white/5"
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onclick="switchMode('cards')"
+                  class="home-stat-card rounded-2xl border border-black/5 bg-white p-4 text-left shadow-soft dark:border-white/10 dark:bg-white/5"
+                  aria-label="Открыть карточки"
                 >
-                  <div
+                  <span
                     id="stat-terms"
-                    class="font-display text-3xl font-black text-gold"
+                    class="block font-display text-3xl font-black text-gold"
                   >
                     0
-                  </div>
-                  <div
-                    class="mt-1 text-xs font-bold uppercase text-black/50 dark:text-white/50"
+                  </span>
+                  <span
+                    class="mt-1 block text-xs font-bold uppercase text-black/50 dark:text-white/50"
                   >
                     карточек
-                  </div>
-                </div>
-                <div
-                  class="rounded-2xl border border-black/5 bg-white p-4 shadow-soft dark:border-white/10 dark:bg-white/5"
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onclick="switchMode('quiz')"
+                  class="home-stat-card rounded-2xl border border-black/5 bg-white p-4 text-left shadow-soft dark:border-white/10 dark:bg-white/5"
+                  aria-label="Открыть тесты"
                 >
-                  <div
+                  <span
                     id="stat-quiz"
-                    class="font-display text-3xl font-black text-ink dark:text-white"
+                    class="block font-display text-3xl font-black text-ink dark:text-white"
                   >
                     0
-                  </div>
-                  <div
-                    class="mt-1 text-xs font-bold uppercase text-black/50 dark:text-white/50"
+                  </span>
+                  <span
+                    class="mt-1 block text-xs font-bold uppercase text-black/50 dark:text-white/50"
                   >
                     вопросов
-                  </div>
-                </div>
+                  </span>
+                </button>
               </div>
             </div>
           </div>
@@ -640,7 +667,7 @@
                 Открыть все
               </button>
             </div>
-            <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            <div class="course-card-grid grid gap-4 md:grid-cols-2 xl:grid-cols-3">
               <button
                 data-topic-id="b1"
                 class="group rounded-2xl border border-black/5 bg-white p-6 text-left shadow-soft transition hover:-translate-y-1 hover:shadow-lift dark:border-white/10 dark:bg-white/5"
@@ -882,7 +909,7 @@
                 Материалы для повторения
               </h2>
             </div>
-            <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <div class="home-sections-grid grid gap-4 md:grid-cols-2 xl:grid-cols-4">
               <div
                 class="rounded-2xl border border-black/5 bg-white p-6 shadow-soft dark:border-white/10 dark:bg-white/5"
               >
@@ -1084,8 +1111,6 @@
 
     <script src="https://cdn.jsdelivr.net/npm/gsap@3/dist/gsap.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/gsap@3/dist/ScrollTrigger.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/gsap@3/dist/Flip.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/gsap@3/dist/Observer.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/gsap@3/dist/TextPlugin.min.js"></script>
     <script src="./animations.js"></script>
     <script src="./history-docx-data.js"></script>
@@ -2855,9 +2880,6 @@
           }
         },
       };
-      let bookmarks = storage
-        .read("hist_bookmarks_unified", [])
-        .filter((b) => BOOK_DATA.some((t) => t.id === b.id));
       let readSections = storage
         .read("hist_read_unified", [])
         .filter((id) => BOOK_DATA.some((t) => t.id === id));
@@ -2883,7 +2905,6 @@
         renderModeButtons("read");
         renderPeriods();
         renderSearchResults();
-        renderBookmarks();
         bindDelegatedClicks();
         updateProgress();
         const initialTopicId = location.hash
@@ -3144,6 +3165,7 @@
         activeCategory = category;
         renderPeriods();
         renderSearchResults();
+        resetPeriodFilterScroll();
         switchMode("read", false);
       }
 
@@ -3210,7 +3232,6 @@
         location.hash = topic.id;
         document.getElementById("header-category").innerText = topic.category;
         document.getElementById("header-title").innerText = topic.title;
-        const isBookmarked = bookmarks.some((b) => b.id === topic.id);
         const isRead = readSections.includes(topic.id);
         const currentIndex = BOOK_DATA.findIndex((t) => t.id === topic.id);
         const prevTopic = currentIndex > 0 ? BOOK_DATA[currentIndex - 1] : null;
@@ -3239,10 +3260,6 @@
 
         document.getElementById("article-body").innerHTML = `
                 <div class="mb-5 flex flex-wrap items-center justify-end gap-2">
-                    <button onclick="toggleBookmark('${topic.id}')" class="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-bold transition ${isBookmarked ? "border-gold bg-gold/15 text-ink dark:text-gold" : "border-slate-200 bg-white/70 text-slate-500 hover:text-ink dark:border-slate-700 dark:bg-slate-800 dark:hover:text-white"}">
-                        <svg class="h-4 w-4" ${isBookmarked ? 'fill="currentColor"' : 'fill="none"'} stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"></path></svg>
-                        Избранное
-                    </button>
                     <button onclick="markAsRead('${topic.id}')" class="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-bold transition ${isRead ? "border-forest bg-emerald-50 text-forest dark:bg-emerald-950/20 dark:text-emerald-300" : "border-slate-200 bg-white/70 text-slate-500 hover:text-forest dark:border-slate-700 dark:bg-slate-800 dark:hover:text-emerald-300"}">
                         <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                         Изучено
@@ -3257,62 +3274,55 @@
         renderPeriods();
         hideSearchDropdowns();
         toggleMobileNav(false);
+        resetPeriodFilterScroll();
         window.scrollTo({ top: 0, behavior: "smooth" });
       }
 
       function switchMode(mode, shouldClose = true) {
-        ["home", "read", "cards", "quiz"].forEach((m) =>
-          document.getElementById(`view-${m}`).classList.add("hidden"),
-        );
-        document.getElementById(`view-${mode}`).classList.remove("hidden");
+        const isMobile = window.matchMedia("(max-width: 767px)").matches;
+        const views = ["home", "read", "cards", "quiz"];
+
         renderModeButtons(mode);
-        if (mode === "cards") renderCards();
-        if (mode === "quiz") startQuiz();
         if (shouldClose) toggleMobileNav(false);
+
+        const newView = document.getElementById(`view-${mode}`);
+        if (!newView) return;
+
+        views.forEach((m) => document.getElementById(`view-${m}`).classList.add("hidden"));
+
+        newView.classList.remove("hidden");
+
+        if (isMobile) {
+          newView.classList.remove("mobile-view-enter");
+          requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+              newView.classList.add("mobile-view-enter");
+              const onEnd = () => {
+                newView.classList.remove("mobile-view-enter");
+                newView.removeEventListener("animationend", onEnd);
+              };
+              newView.addEventListener("animationend", onEnd, { once: true });
+            });
+          });
+        }
+
+        if (mode === "cards") {
+          requestAnimationFrame(() => renderCards());
+        } else if (mode === "quiz") {
+          startQuiz();
+        }
+
+        resetPeriodFilterScroll();
+      }
+
+      function resetPeriodFilterScroll() {
+        const filter = document.getElementById("period-filter");
+        if (filter) filter.scrollTop = 0;
       }
 
       function openFirstVisibleTopic() {
         const topic = visibleTopics()[0] || BOOK_DATA[0];
         selectTopic(topic.id);
-      }
-
-      function renderBookmarks() {
-        const container = document.getElementById("bookmarks-container");
-        if (!bookmarks.length) {
-          container.innerHTML =
-            '<p class="rounded-xl bg-slate-50 p-3 text-center italic dark:bg-slate-800">Закладок пока нет.</p>';
-          return;
-        }
-        container.innerHTML = bookmarks
-          .map((b) => {
-            const topic = BOOK_DATA.find((item) => item.id === b.id);
-            if (!topic) return "";
-            return `
-                    <div class="flex items-center justify-between gap-2 rounded-lg bg-slate-50 p-2 transition hover:bg-white dark:bg-slate-800/70 dark:hover:bg-slate-800">
-                        <button type="button" data-topic-id="${topic.id}" class="topic-link min-w-0 truncate text-left font-semibold text-slate-700 hover:text-ink dark:text-slate-300 dark:hover:text-white">${topic.title}</button>
-                        <button type="button" data-bookmark-id="${topic.id}" class="bookmark-remove grid h-8 w-8 flex-shrink-0 place-items-center rounded-lg text-berry hover:bg-rose-50 dark:text-rose-300 dark:hover:bg-rose-950/20" aria-label="Удалить закладку">
-                            <svg class="h-4 w-4" fill="currentColor" viewBox="0 0 20 20"><path d="M5 4a2 2 0 012-2h6a2 2 0 012 2v14l-5-2.5L5 18V4z"></path></svg>
-                        </button>
-                    </div>
-                `;
-          })
-          .join("");
-      }
-
-      function toggleBookmark(id) {
-        const topic = BOOK_DATA.find((t) => t.id === id);
-        if (!topic) return;
-        const index = bookmarks.findIndex((b) => b.id === id);
-        if (index === -1) {
-          bookmarks.push({ id, title: topic.title });
-          showToast("Добавлено в избранное");
-        } else {
-          bookmarks.splice(index, 1);
-          showToast("Удалено из избранного");
-        }
-        storage.write("hist_bookmarks_unified", bookmarks);
-        renderBookmarks();
-        selectTopic(id);
       }
 
       function bindDelegatedClicks() {
@@ -3343,13 +3353,6 @@
             openQuestionResult(
               Number(questionButton.getAttribute("data-question-index")),
             );
-            return;
-          }
-
-          const bookmarkButton = target.closest("[data-bookmark-id]");
-          if (bookmarkButton) {
-            event.preventDefault();
-            toggleBookmark(bookmarkButton.getAttribute("data-bookmark-id"));
             return;
           }
 
@@ -3411,6 +3414,26 @@
         renderSearchResults();
       }
 
+      function resetPeriodsPanel() {
+        clearSearch();
+        Object.keys(localStorage).forEach(function(key) {
+          if (key.includes('collapsed_periods') || key.includes('periods_collapsed')) {
+            localStorage.removeItem(key);
+          }
+        });
+        document.querySelectorAll('.period-group, .codex-period-group').forEach(function(group) {
+          group.classList.remove('is-collapsed');
+          group.classList.add('is-active');
+        });
+        document.querySelectorAll('[data-period-toggle]').forEach(function(btn) {
+          btn.setAttribute('aria-expanded', 'true');
+        });
+        if (typeof renderPremiumPeriods === 'function') {
+          try { renderPremiumPeriods(); } catch(e) {}
+        }
+        if (typeof renderPeriods === 'function') renderPeriods();
+      }
+
       function hideSearchDropdowns() {
         [
           "desktop-search-results-card",
@@ -3420,6 +3443,33 @@
           const element = document.getElementById(id);
           if (element) element.classList.add("hidden");
         });
+      }
+
+      function buildCardHTML(card, index) {
+        const meta = CARD_TYPE_META[card.type] || CARD_TYPE_META.term;
+        const tags = (card.tags || []).slice(0, 3);
+        return `<div id="term-wrap-${index}" class="perspective-1000 h-64 cursor-pointer rounded-2xl transition" onclick="flipCard(${index})">
+          <div id="card-${index}" class="preserve-3d relative h-full w-full transition-transform duration-500">
+            <div class="backface-hidden absolute inset-0 flex flex-col justify-between rounded-2xl border border-white/80 bg-white/90 p-5 shadow-soft dark:border-slate-800 dark:bg-slate-900/90">
+              <div class="flex items-center justify-between gap-3">
+                <span class="rounded-full px-2.5 py-1 text-[11px] font-black uppercase tracking-wider ${meta.className}">${meta.label}</span>
+                <span class="text-right text-[11px] font-bold uppercase tracking-wider text-black/35 dark:text-white/35">${escapeHTML(card.period)}</span>
+              </div>
+              <h3 class="my-auto text-center font-serif text-2xl font-bold leading-tight text-ink dark:text-white">${escapeHTML(card.front)}</h3>
+              <span class="text-center text-xs text-slate-400">Нажмите, чтобы перевернуть</span>
+            </div>
+            <div class="rotate-y-180 backface-hidden absolute inset-0 flex flex-col justify-between rounded-2xl bg-ink p-5 text-white shadow-lift dark:bg-[#2d1f0e] dark:text-[#f1e7d2]">
+              <div class="flex items-center justify-between gap-3">
+                <span class="rounded-full px-2.5 py-1 text-[11px] font-black uppercase tracking-wider bg-gold text-ink">${meta.label}</span>
+                <span class="text-right text-[11px] font-bold uppercase tracking-wider opacity-60">${escapeHTML(card.ticket)}</span>
+              </div>
+              <p class="my-auto text-center text-sm font-medium leading-relaxed">${escapeHTML(card.back)}</p>
+              <div class="flex flex-wrap justify-center gap-1.5">
+                ${tags.map((tag) => `<span class="rounded-full bg-white/10 px-2 py-1 text-[10px] font-bold uppercase tracking-wider dark:bg-black/10">${escapeHTML(tag)}</span>`).join("")}
+              </div>
+            </div>
+          </div>
+        </div>`;
       }
 
       function renderCards() {
@@ -3437,36 +3487,43 @@
             '<div class="col-span-full rounded-2xl border border-black/5 bg-white p-8 text-center text-sm font-semibold text-black/50 dark:border-white/10 dark:bg-white/5 dark:text-white/50">Карточки не найдены. Измените фильтр или поисковый запрос.</div>';
           return;
         }
-        container.innerHTML = cards
-          .map(({ card, index }) => {
-            const meta = CARD_TYPE_META[card.type] || CARD_TYPE_META.term;
-            const tags = (card.tags || []).slice(0, 3);
-            return `
-                <div id="term-wrap-${index}" class="perspective-1000 h-64 cursor-pointer rounded-2xl transition" onclick="flipCard(${index})">
-                    <div id="card-${index}" class="preserve-3d relative h-full w-full transition-transform duration-500">
-                        <div class="backface-hidden absolute inset-0 flex flex-col justify-between rounded-2xl border border-white/80 bg-white/90 p-5 shadow-soft dark:border-slate-800 dark:bg-slate-900/90">
-                            <div class="flex items-center justify-between gap-3">
-                                <span class="rounded-full px-2.5 py-1 text-[11px] font-black uppercase tracking-wider ${meta.className}">${meta.label}</span>
-                                <span class="text-right text-[11px] font-bold uppercase tracking-wider text-black/35 dark:text-white/35">${escapeHTML(card.period)}</span>
-                            </div>
-                            <h3 class="my-auto text-center font-serif text-2xl font-bold leading-tight text-ink dark:text-white">${escapeHTML(card.front)}</h3>
-                            <span class="text-center text-xs text-slate-400">Нажмите, чтобы перевернуть</span>
-                        </div>
-                        <div class="rotate-y-180 backface-hidden absolute inset-0 flex flex-col justify-between rounded-2xl bg-ink p-5 text-white shadow-lift dark:bg-white dark:text-ink">
-                            <div class="flex items-center justify-between gap-3">
-                                <span class="rounded-full px-2.5 py-1 text-[11px] font-black uppercase tracking-wider bg-gold text-ink">${meta.label}</span>
-                                <span class="text-right text-[11px] font-bold uppercase tracking-wider opacity-60">${escapeHTML(card.ticket)}</span>
-                            </div>
-                            <p class="my-auto text-center text-sm font-medium leading-relaxed">${escapeHTML(card.back)}</p>
-                            <div class="flex flex-wrap justify-center gap-1.5">
-                                ${tags.map((tag) => `<span class="rounded-full bg-white/10 px-2 py-1 text-[10px] font-bold uppercase tracking-wider dark:bg-black/10">${escapeHTML(tag)}</span>`).join("")}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            `;
-          })
-          .join("");
+
+        const isMobile = window.matchMedia("(max-width: 767px)").matches;
+        const INITIAL = 24;
+        const CHUNK = 24;
+
+        if (!isMobile || cards.length <= INITIAL) {
+          container.innerHTML = cards.map(({ card, index }) => buildCardHTML(card, index)).join("");
+          return;
+        }
+
+        container.innerHTML = cards.slice(0, INITIAL).map(({ card, index }) => buildCardHTML(card, index)).join("");
+
+        let offset = INITIAL;
+        function appendChunk() {
+          if (offset >= cards.length) return;
+          const slice = cards.slice(offset, offset + CHUNK);
+          const html = slice.map(({ card, index }) => buildCardHTML(card, index)).join("");
+          const tmp = document.createElement("div");
+          tmp.innerHTML = html;
+          const frag = document.createDocumentFragment();
+          while (tmp.firstChild) frag.appendChild(tmp.firstChild);
+          container.appendChild(frag);
+          offset += CHUNK;
+          if (offset < cards.length) {
+            if (typeof requestIdleCallback !== "undefined") {
+              requestIdleCallback(appendChunk, { timeout: 600 });
+            } else {
+              requestAnimationFrame(appendChunk);
+            }
+          }
+        }
+
+        if (typeof requestIdleCallback !== "undefined") {
+          requestIdleCallback(appendChunk, { timeout: 400 });
+        } else {
+          requestAnimationFrame(appendChunk);
+        }
       }
 
       function renderCardFilters() {
@@ -3654,8 +3711,25 @@
           typeof force === "boolean"
             ? force
             : !drawer.classList.contains("open");
+        const isMobile = window.matchMedia("(max-width: 767px)").matches;
+
         drawer.classList.toggle("open", open);
-        overlay.classList.toggle("hidden", !open);
+
+        if (isMobile) {
+          if (open) {
+            overlay.classList.remove("hidden");
+            requestAnimationFrame(() => overlay.classList.add("is-open"));
+          } else {
+            overlay.classList.remove("is-open");
+            const hideOverlay = () => overlay.classList.add("hidden");
+            overlay.addEventListener("transitionend", hideOverlay, { once: true });
+            setTimeout(hideOverlay, 250);
+          }
+        } else {
+          overlay.classList.toggle("hidden", !open);
+          overlay.classList.remove("is-open");
+        }
+
         overlay.setAttribute("aria-hidden", String(!open));
         document
           .querySelector('[aria-controls="mobile-drawer"]')
@@ -3682,8 +3756,51 @@
           toggleMobileNav(false);
         }
       });
-      window.onload = initApp;
+
+      function debounce(callback, delay = 120) {
+        let timer;
+        return (...args) => {
+          window.clearTimeout(timer);
+          timer = window.setTimeout(() => callback(...args), delay);
+        };
+      }
+
+      function syncLayoutVars() {
+        const header = document.querySelector("header");
+        if (!header) return;
+        document.documentElement.style.setProperty(
+          "--header-h",
+          `${Math.ceil(header.getBoundingClientRect().height)}px`,
+        );
+      }
+
+      const _isMobile = () => window.matchMedia("(max-width: 767px)").matches;
+      const _debouncedSearch = debounce(handleSearch, 150);
+      document.addEventListener("DOMContentLoaded", () => {
+        const mobileSearchInputs = [
+          document.getElementById("mobile-top-search"),
+          document.getElementById("mobile-search"),
+        ].filter(Boolean);
+        mobileSearchInputs.forEach((input) => {
+          input.removeAttribute("oninput");
+          input.addEventListener("input", (e) => {
+            if (_isMobile()) {
+              _debouncedSearch(e.target.value);
+            } else {
+              handleSearch(e.target.value);
+            }
+          });
+        });
+      });
+
+      window.addEventListener("resize", debounce(syncLayoutVars, 120));
+      window.addEventListener("orientationchange", syncLayoutVars);
+      document.addEventListener("DOMContentLoaded", syncLayoutVars);
+      window.onload = () => {
+        syncLayoutVars();
+        initApp();
+      };
     </script>
-    <script src="./codex-premium-ui.js"></script>
+    <script src="./codex-premium-ui.js?v=20260620-unified-desktop-template"></script>
   </body>
 </html>

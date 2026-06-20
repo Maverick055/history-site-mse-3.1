@@ -1,5 +1,6 @@
 (function () {
   const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const lowPowerUI = window.matchMedia("(max-width: 1023px), (pointer: coarse)");
 
   function ready(callback) {
     if (document.readyState === "loading") {
@@ -13,12 +14,14 @@
     return !reduceMotion && window.gsap;
   }
 
+  function motionDuration(value) {
+    return lowPowerUI.matches ? Math.min(value, 0.16) : value;
+  }
+
   function registerPlugins() {
     if (!window.gsap) return;
     const plugins = [
       window.ScrollTrigger,
-      window.Flip,
-      window.Observer,
       window.TextPlugin,
     ].filter(Boolean);
     if (plugins.length) window.gsap.registerPlugin(...plugins);
@@ -54,7 +57,7 @@
   }
 
   function animateHomeSections() {
-    if (!canAnimate() || !window.ScrollTrigger) return;
+    if (!canAnimate() || lowPowerUI.matches || !window.ScrollTrigger) return;
     gsap.utils.toArray("#view-home > section").forEach((section) => {
       gsap.from(section, {
         scrollTrigger: { trigger: section, start: "top 85%", once: true },
@@ -81,12 +84,12 @@
     if (!canAnimate()) return;
     const article = document.getElementById("article-body");
     if (!article) return;
-    const blocks = article.querySelectorAll(".exam-structured-section, .exam-main-answer, .exam-source-note, .article-info-card, .final-callout");
+    const blocks = [...article.querySelectorAll(".exam-structured-section, .exam-main-answer, .exam-source-note, .article-info-card, .final-callout")].slice(0, 12);
     if (!blocks.length) return;
     gsap.fromTo(
       blocks,
-      { autoAlpha: 0, y: 12 },
-      { autoAlpha: 1, y: 0, duration: 0.32, stagger: 0.035, ease: "power2.out", overwrite: true },
+      { autoAlpha: 0, y: 10 },
+      { autoAlpha: 1, y: 0, duration: motionDuration(0.22), stagger: lowPowerUI.matches ? 0.012 : 0.022, ease: "power2.out", overwrite: true },
     );
   }
 
@@ -103,7 +106,7 @@
         ease: "power2.out",
         onComplete: () => {
           original.apply(this, args);
-          gsap.fromTo(article, { autoAlpha: 0, y: 16 }, { autoAlpha: 1, y: 0, duration: 0.34, ease: "power3.out" });
+          gsap.fromTo(article, { autoAlpha: 0, y: 12 }, { autoAlpha: 1, y: 0, duration: motionDuration(0.22), ease: "power2.out" });
           animateArticleBlocks();
         },
       });
@@ -115,20 +118,36 @@
     if (!canAnimate() || typeof window.switchMode !== "function" || window.switchMode.__animated) return;
     const original = window.switchMode;
     window.switchMode = function (...args) {
-      const main = document.querySelector("main");
-      const state = window.Flip && main ? Flip.getState(main.children) : null;
       const result = original.apply(this, args);
       const mode = args[0];
       const view = document.getElementById(`view-${mode}`);
-      if (state && window.Flip) {
-        Flip.from(state, { duration: 0.24, ease: "power2.out", absolute: false, prune: true });
-      }
       if (view) {
-        gsap.fromTo(view, { autoAlpha: 0, y: 10 }, { autoAlpha: 1, y: 0, duration: 0.24, ease: "power2.out", overwrite: true });
+        gsap.killTweensOf(view);
+        gsap.fromTo(view, { autoAlpha: 0, y: 8 }, { autoAlpha: 1, y: 0, duration: motionDuration(0.16), ease: "power2.out", overwrite: true });
+        animateViewContent(mode);
       }
       return result;
     };
     window.switchMode.__animated = true;
+  }
+
+  function animateViewContent(mode) {
+    if (!canAnimate()) return;
+    const selectors = {
+      home: "#view-home > .fade-up, #view-home > section",
+      read: "#article-body > div, #article-body .exam-structured-section, #article-body .exam-main-answer",
+      cards: "#view-cards > div, #card-type-filters button, #card-summary",
+      quiz: "#quiz-question-text, #quiz-answers-container .quiz-option-btn, #btn-next-question",
+    };
+    const items = [...document.querySelectorAll(selectors[mode] || "")]
+      .filter((item) => !item.classList.contains("hidden"))
+      .slice(0, mode === "cards" ? 18 : 12);
+    if (!items.length) return;
+    gsap.fromTo(
+      items,
+      { autoAlpha: 0, y: 10 },
+      { autoAlpha: 1, y: 0, duration: motionDuration(0.18), stagger: lowPowerUI.matches ? 0.01 : 0.018, ease: "power2.out", overwrite: true },
+    );
   }
 
   function wrapCards() {
@@ -136,17 +155,39 @@
     const original = window.renderCards;
     window.renderCards = function (...args) {
       const container = document.getElementById("cards-container");
-      const state = window.Flip && container ? Flip.getState(container.children) : null;
       const result = original.apply(this, args);
-      if (state && window.Flip) {
-        Flip.from(state, { duration: 0.28, ease: "power2.out", absolute: false, prune: true });
-      }
-      const cards = container ? container.querySelectorAll(".perspective-1000") : [];
+      const cards = container ? [...container.querySelectorAll(".perspective-1000")].slice(0, 18) : [];
       if (!cards.length) return result;
-      gsap.fromTo(cards, { autoAlpha: 0, scale: 0.97, y: 12 }, { autoAlpha: 1, scale: 1, y: 0, duration: 0.34, stagger: 0.025, ease: "power2.out", overwrite: true });
+      gsap.fromTo(cards, { autoAlpha: 0, y: 10 }, { autoAlpha: 1, y: 0, duration: motionDuration(0.18), stagger: lowPowerUI.matches ? 0.01 : 0.018, ease: "power2.out", overwrite: true });
       return result;
     };
     window.renderCards.__animated = true;
+  }
+
+  function animateQuizContent() {
+    if (!canAnimate()) return;
+    const items = [
+      document.getElementById("quiz-question-text"),
+      ...document.querySelectorAll("#quiz-answers-container .quiz-option-btn"),
+      document.getElementById("btn-next-question"),
+    ].filter((item) => item && !item.classList.contains("hidden"));
+    if (!items.length) return;
+    gsap.fromTo(
+      items,
+      { autoAlpha: 0, y: 10 },
+      { autoAlpha: 1, y: 0, duration: motionDuration(0.18), stagger: lowPowerUI.matches ? 0.012 : 0.018, ease: "power2.out", overwrite: true },
+    );
+  }
+
+  function wrapQuiz() {
+    if (!canAnimate() || typeof window.showQuestion !== "function" || window.showQuestion.__animated) return;
+    const original = window.showQuestion;
+    window.showQuestion = function (...args) {
+      const result = original.apply(this, args);
+      requestAnimationFrame(animateQuizContent);
+      return result;
+    };
+    window.showQuestion.__animated = true;
   }
 
   function wrapSearchResults() {
@@ -169,16 +210,10 @@
     if (shells.length) {
       gsap.fromTo(shells, { autoAlpha: 0, y: -6 }, { autoAlpha: 1, y: 0, duration: 0.24, stagger: 0.035, ease: "power3.out", overwrite: true });
     }
-    document.addEventListener("focusin", (event) => {
-      const wrap = event.target.closest && event.target.closest(".codex-search-wrap");
-      if (!wrap) return;
-      gsap.to(wrap, { scale: 1.012, duration: 0.18, ease: "power2.out", overwrite: true });
-    });
-    document.addEventListener("focusout", (event) => {
-      const wrap = event.target.closest && event.target.closest(".codex-search-wrap");
-      if (!wrap) return;
-      gsap.to(wrap, { scale: 1, duration: 0.18, ease: "power2.out", overwrite: true });
-    });
+    // NOTE: never apply a transform (scale) to .codex-search-wrap on focus.
+    // A transform on the wrap makes it the containing block for the
+    // position:fixed search dropdown, offsetting it off-screen. The dropdown
+    // is portaled to <body> and must stay viewport-relative.
   }
 
   function enhanceProgress() {
@@ -217,6 +252,7 @@
     wrapTopicSelection();
     wrapModeSwitching();
     wrapCards();
+    wrapQuiz();
     wrapSearchResults();
     enhanceSearchShell();
     microInteractions();
